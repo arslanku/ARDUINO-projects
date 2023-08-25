@@ -1,0 +1,78 @@
+// ======================= НАСТРОЙКИ =======================
+
+
+#define SENSOR_PIN 2  // пин подключения датчика
+
+#define SENSOR_VALUE_MIN 0     // минимальное показание датчика
+#define SENSOR_VALUE_MAX 1023  // макимальное показание датчика
+
+#define SERVO_PIN 5  // пин для подключения сервопривода
+
+#define SERVO_SPEED 80  // скорость сервопривода (град/сек)
+#define SERVO_ACCEL 1   // скорость ускорения/торможения
+
+#define SERVO_ANGLE_MIN 0    // минимальный угол сервопривода
+#define SERVO_ANGLE_MAX 180  // максимальный угол сервопривода
+
+#define MODE 1  // режимы работы (1, 2, 3)
+
+
+// ==========================================================
+
+
+#include <ServoSmooth.h>
+ServoSmooth servo;  // объявляем объект класса ServoSmooth
+
+#include "Tacho.h"
+Tachometer tacho;        // объявляем объект класса Tacho
+
+
+void setup() {
+
+  Serial.begin(9600);
+  Serial.println("Начало работы");
+
+  servo.attach(SERVO_PIN);
+
+  servo.setSpeed(SERVO_SPEED);  // ограничить скорость
+  servo.setAccel(SERVO_ACCEL);  // установить ускорение (разгон и торможение)
+
+  servo.setTargetDeg(0);
+
+  attachInterrupt(0, sensor, RISING);  //подключить прерывание на 2 пин при повышении сигнала
+}
+
+
+void loop() {
+  servo.tick();
+
+  static int value = 0;
+  static byte angle = 0;  // переменная для угла сервопривода
+
+  Serial.print("Значение с датчика: ");
+  Serial.println(value);
+
+  if (MODE == 1) {
+    value = tacho.getRPM();
+  } else if (MODE == 2) {
+    value = tacho.getHz();
+  } else if (MODE == 3) {
+    value = tacho.getUs();
+  }
+
+  angle = map(value, SENSOR_VALUE_MIN, SENSOR_VALUE_MAX, SERVO_ANGLE_MIN, SERVO_ANGLE_MAX);
+  /*
+  Преобразуем значение получаемое с датчика в значение угла сервопривода
+  с помощью функции map()
+  */
+
+  Serial.print("Значение угла: ");
+  Serial.println(angle);
+
+  servo.setTargetDeg(angle);  //устанавливаем угол на сервоприводе
+}
+
+
+void sensor() {
+  tacho.tick();
+}
