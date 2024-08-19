@@ -1,0 +1,5 @@
+BROKER = mqtt.dealgate.ru
+USERNAME = skalper101
+PASSWORD = 987654321
+PORT = 1883
+DATA_TOPIC = /data
