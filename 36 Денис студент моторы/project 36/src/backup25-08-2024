@@ -21,28 +21,15 @@
 #define SENSOR_LOW 100  // нижний порог значений с датчика (от 0 до 1023)
 #define SENSOR_HIGH 400 // верхний порог значений с датчика (от 0 до 1023)
 
+#define MAX_WORKING_TIME 20000 // макисмальное время работы мотора (в миллисекундах)
+
 int sensor1; // переменная, которая будет хранить значения с датчика 1
 int sensor2; // переменная, которая будет хранить значения с датчика 2
 int sensor3; // переменная, которая будет хранить значения с датчика 3
 int sensor4; // переменная, которая будет хранить значения с датчика 4
 
-#define START_WORKING_DAY 7
-#define FINISH_WORKING_DAY 22
-
-#define SLEEP_TIME 10800 // время сна (в секундах)
-
-int hours;
-bool isWorkTimeNow;
-
-// ==================================================================
-// ПОДКЛЮЧЕНИЕ БИБЛИОТЕК
-
-#include <microDS3231.h>
-MicroDS3231 rtc;
-
-#include <GyverPower.h>
-
-// EEPROM
+unsigned int timer_motor1; // таймер работы мотора 1 (в миллисекундах)
+unsigned int timer_motor2; // таймер работы мотора 2 (в миллисекундах)
 
 // ==================================================================
 // ФУНКЦИИ РАБОТЫ С МОТОРАМИ
@@ -120,24 +107,6 @@ void setup()
   pinMode(STBY, OUTPUT);
 
   digitalWrite(STBY, HIGH);
-
-  // автоматическая калибровка таймера для сна
-  power.autoCalibrate();
-  // настройка режима сна
-  power.setSleepMode(EXTSTANDBY_SLEEP);
-
-  // проверка наличия модуля ds3231 на линии i2c
-  if (!rtc.begin())
-  {
-    Serial.println("[ИНФО] DS3231 подключен успшешно");
-  }
-  else
-  {
-    Serial.println("[ОШИБКА] DS3231 не подключен");
-  }
-
-  // установить время равное времени компиляции программы (берем время с компьютера)
-  rtc.setTime(COMPILE_TIME);
 }
 
 void loop()
@@ -157,37 +126,6 @@ void loop()
   Serial.print(" | ");
   Serial.println(sensor4);
 
-  // ПРОВЕРКА РАБОЧЕГО ВРЕМЕНИ ======================================
-  hours = rtc.getHours();
-  if (hours >= START_WORKING_DAY and hours < FINISH_WORKING_DAY)
-  {
-    isWorkTimeNow = true;
-  }
-  else
-  {
-    isWorkTimeNow = false;
-  }
-
-  // ================================================================
-
-  // if (millis() - timer3 >= 300000)
-  //   {
-  //       timer3 = millis();
-  //       sens = sensor;
-  //       EEPROM.put(Add1, sens);
-  //       EEPROM.put(Add2, t);
-  //       Add1 = Add1 + 4;
-  //       Add2 = Add2 + 4;
-  //       if (Add1 > 1020)
-  //       {
-  //           Add1 = 0;
-  //       } // при заполнении всех ячеек памяти (1023)цикл записи начнет перезаписывать наиболее старые значения
-  //       if (Add2 > 1022)
-  //       {
-  //           Add2 = 2;
-  //       } // при заполнении всех ячеек памяти (1023)цикл записи начнет перезаписывать наиболее старые значения
-  //   }
-
   // ПЕРВЫЙ МОТОР ===================================================
   if (
       ((SENSOR_LOW < sensor1 and sensor1 < SENSOR_HIGH) and sensor2 <= SENSOR_LOW) or
@@ -199,9 +137,13 @@ void loop()
 
     // выключаем мотор 1
     motor1_off();
+
+    // обнуляем таймер работы мотора 1
+    timer_motor1 = 0;
   }
   else if (
-      (sensor1 < SENSOR_LOW and sensor2 < SENSOR_LOW) and isWorkTimeNow)
+      (sensor1 < SENSOR_LOW and sensor2 < SENSOR_LOW) and
+      timer_motor1 < MAX_WORKING_TIME)
   {
     // Если оба значения с датчиков 1 и 2 меньше значения В,
     // то включаем мотор-редуктор1 против часовой стрелки, чтобы замотать
@@ -209,9 +151,13 @@ void loop()
 
     // включаем мотор 1 против часовой стрелки
     motor1_backward();
+
+    // обновляем значение переменной таймера, для слежения за временем работы мотора
+    timer_motor1 = millis();
   }
   else if (
-      (sensor1 > SENSOR_HIGH or sensor2 > SENSOR_HIGH) and isWorkTimeNow)
+      (sensor1 > SENSOR_HIGH or sensor2 > SENSOR_HIGH) and
+      timer_motor1 < MAX_WORKING_TIME)
   {
     // Если хотя бы один из значений датчиков 1 или 2 больше значения В,
     // то включаем мотор-редуктор1 по часовой стрелки, чтобы размотать
@@ -219,6 +165,9 @@ void loop()
 
     // включаем мотор 2 по часовой стрелке
     motor1_forward();
+
+    // обновляем значение переменной таймера, для слежения за временем работы мотора
+    timer_motor1 = millis();
   }
 
   // ВТОРОЙ МОТОР ===================================================
@@ -232,9 +181,13 @@ void loop()
 
     // выключаем мотор 2
     motor2_off();
+
+    // обнуляем таймер работы мотора 2
+    timer_motor2 = 0;
   }
   else if (
-      (sensor3 < SENSOR_LOW and sensor4 < SENSOR_LOW) and isWorkTimeNow)
+      (sensor3 < SENSOR_LOW and sensor4 < SENSOR_LOW) and
+      timer_motor2 < MAX_WORKING_TIME)
   {
     // Если оба значения с датчиков 3 и 4 меньше значения В,
     // то включаем мотор-редуктор2 против часовой стрелки, чтобы замотать
@@ -242,9 +195,13 @@ void loop()
 
     // включаем мотор 2 против часовой стрелки
     motor2_backward();
+
+    // обновляем значение переменной таймера, для слежения за временем работы мотора
+    timer_motor2 = millis();
   }
   else if (
-      (sensor3 > SENSOR_HIGH or sensor4 > SENSOR_HIGH) and isWorkTimeNow)
+      (sensor3 > SENSOR_HIGH or sensor4 > SENSOR_HIGH) and
+      timer_motor2 < MAX_WORKING_TIME)
   {
     // Если хотя бы один из значений датчиков 3 или 4 больше значения В,
     // то включаем мотор-редуктор2 по часовой стрелки, чтобы размотать
@@ -252,7 +209,8 @@ void loop()
 
     // включаем мотор 2 по часовой стрелке
     motor2_forward();
-  }
 
-  power.sleepDelay(SLEEP_TIME * 1000);
+    // обновляем значение переменной таймера, для слежения за временем работы мотора
+    timer_motor2 = millis();
+  }
 }

@@ -1,6 +1,3 @@
-// Подключаем библиотеку Arduino
-#include <Arduino.h>
-
 // Подключаем библиотеку Wire
 #include <Wire.h>
 
