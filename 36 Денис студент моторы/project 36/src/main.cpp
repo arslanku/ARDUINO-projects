@@ -34,9 +34,9 @@ int sensor4; // переменная, для храния значения с д
 // ==================================================================
 // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ РАБОТЫ ПРОГРАММЫ
 
-int eeprom_addres;                           // переменная для адреса в EEPROM, по которому будем записывать данные с датчиков
-bool is_working_time_now;                    // переменная для проверки рабочего периода времени
-bool motor1_running_now, motor2_running_now; // переменные для текущего состояния работы двигателей
+int eeprom_addres;                   // переменная для адреса в EEPROM, по которому будем записывать данные с датчиков
+bool working_time;                   // переменная для проверки рабочего периода времени (с 7:00 до 22:00)
+bool motor1_running, motor2_running; // переменные для текущего состояния работы двигателей
 
 // структура для хранения данных с датчиков
 struct Data
@@ -146,7 +146,7 @@ void setup()
   power.setSleepMode(EXTSTANDBY_SLEEP);
 
   // проверка наличия модуля ds3231 на линии i2c
-  if (!rtc.begin())
+  if (rtc.begin())
   {
     Serial.println("[ИНФО] DS3231 подключен успшешно");
   }
@@ -158,11 +158,8 @@ void setup()
   // установить время равное времени компиляции программы (берем время с компьютера)
   rtc.setTime(COMPILE_TIME);
 
-  // получаем адрес для записи данных с датчиков
-  EEPROM.get(1020, eeprom_addres);
-
   // читаем и выводим, с помощью цикла, данные, которые уже есть в памяти
-  Serial.println("Чтение данных из EEPROM памяти:");
+  Serial.println("[ИНФО] Чтение данных из EEPROM памяти:");
   for (int i = 0; i < 100; i++)
   {
     EEPROM.get(i * 10, data);
@@ -179,7 +176,7 @@ void setup()
     Serial.print(" - ");
     Serial.println(data.sensors_value[3]);
   }
-  Serial.println("Чтение данных завершено");
+  Serial.println("[ИНФО] Чтение данных завершено");
 }
 
 void loop()
@@ -190,44 +187,8 @@ void loop()
   sensor3 = analogRead(SENSOR3_PIN);
   sensor4 = analogRead(SENSOR4_PIN);
 
-  // ЗАПИСЬ ДАННЫХ В EEPROM =========================================
-
   // получаем текущее время и записываем его в объект класса DateTime
   DateTime now = rtc.getTime();
-
-  data.day_and_hour[0] = now.day;  // получаем календарный день
-  data.day_and_hour[1] = now.hour; // получаем час
-
-  // записываем значения с датчиков в структуру данных
-  data.sensors_value[0] = sensor1;
-  data.sensors_value[1] = sensor2;
-  data.sensors_value[2] = sensor3;
-  data.sensors_value[3] = sensor4;
-
-  // вывод значений с датчиков на компьютер
-  Serial.println("[ИНФО] Приняты новые данные с датчиков:");
-  Serial.print("Календарный день: ");
-  Serial.print(data.day_and_hour[0]);
-  Serial.print(" | час: ");
-  Serial.print(data.day_and_hour[1]);
-  Serial.print(" - ");
-  Serial.print(data.sensors_value[0]);
-  Serial.print(" - ");
-  Serial.print(data.sensors_value[1]);
-  Serial.print(" - ");
-  Serial.print(data.sensors_value[2]);
-  Serial.print(" - ");
-  Serial.println(data.sensors_value[3]);
-
-  // записываем данные с датчиков в EEPROM память
-  EEPROM.put(eeprom_addres, data);
-  eeprom_addres += 10;
-  if (eeprom_addres >= 1000)
-  {
-    eeprom_addres = 0;
-  }
-  EEPROM.put(eeprom_addres, 1010);
-  Serial.println("[ИНФО] Данные записаны в EEPROM");
 
   // ПРОВЕРКА РАБОЧЕГО ВРЕМЕНИ ======================================
 
@@ -235,14 +196,15 @@ void loop()
   // иначе - нерабочее время (двигатели не смогут работать)
   if (now.hour >= START_WORKING_DAY and now.hour < FINISH_WORKING_DAY)
   {
-    is_working_time_now = true;
+    working_time = true;
   }
   else
   {
-    is_working_time_now = false;
+    working_time = false;
   }
 
   // ПЕРВЫЙ МОТОР ===================================================
+
   if (
       ((SENSOR_LOW < sensor1 and sensor1 < SENSOR_HIGH) and sensor2 <= SENSOR_LOW) or
       ((SENSOR_LOW < sensor2 and sensor2 < SENSOR_HIGH) and sensor1 <= SENSOR_LOW))
@@ -253,32 +215,35 @@ void loop()
 
     // выключаем мотор 1
     motor1_off();
-    motor1_running_now = false;
+    motor1_running = false;
   }
   else if (
-      (sensor1 < SENSOR_LOW and sensor2 < SENSOR_LOW) and is_working_time_now)
+      (sensor1 < SENSOR_LOW and sensor2 < SENSOR_LOW) and working_time)
   {
     // Если оба значения с датчиков 1 и 2 меньше значения В,
     // то включаем мотор-редуктор1 против часовой стрелки, чтобы замотать
     // трос и увеличить давление до нужного.
+    // Так же проверяем рабочий ли сейчас промежуток времени
 
     // включаем мотор 1 против часовой стрелки
     motor1_backward();
-    motor1_running_now = true;
+    motor1_running = true;
   }
   else if (
-      (sensor1 > SENSOR_HIGH or sensor2 > SENSOR_HIGH) and is_working_time_now)
+      (sensor1 > SENSOR_HIGH or sensor2 > SENSOR_HIGH) and working_time)
   {
     // Если хотя бы один из значений датчиков 1 или 2 больше значения В,
     // то включаем мотор-редуктор1 по часовой стрелки, чтобы размотать
     // трос и уменьшить давление до нужного.
+    // Так же проверяем рабочий ли сейчас промежуток времени
 
     // включаем мотор 2 по часовой стрелке
     motor1_forward();
-    motor1_running_now = true;
+    motor1_running = true;
   }
 
   // ВТОРОЙ МОТОР ===================================================
+
   if (
       ((SENSOR_LOW < sensor3 and sensor3 < SENSOR_HIGH) and sensor4 <= SENSOR_LOW) or
       ((SENSOR_LOW < sensor4 and sensor4 < SENSOR_HIGH) and sensor3 <= SENSOR_LOW))
@@ -289,34 +254,80 @@ void loop()
 
     // выключаем мотор 2
     motor2_off();
-    motor2_running_now = false;
+    motor2_running = false;
   }
   else if (
-      (sensor3 < SENSOR_LOW and sensor4 < SENSOR_LOW) and is_working_time_now)
+      (sensor3 < SENSOR_LOW and sensor4 < SENSOR_LOW) and working_time)
   {
     // Если оба значения с датчиков 3 и 4 меньше значения В,
     // то включаем мотор-редуктор2 против часовой стрелки, чтобы замотать
     // трос и увеличить давление до нужного.
+    // Так же проверяем рабочий ли сейчас промежуток времени
 
     // включаем мотор 2 против часовой стрелки
     motor2_backward();
-    motor2_running_now = true;
+    motor2_running = true;
   }
   else if (
-      (sensor3 > SENSOR_HIGH or sensor4 > SENSOR_HIGH) and is_working_time_now)
+      (sensor3 > SENSOR_HIGH or sensor4 > SENSOR_HIGH) and working_time)
   {
     // Если хотя бы один из значений датчиков 3 или 4 больше значения В,
     // то включаем мотор-редуктор2 по часовой стрелки, чтобы размотать
     // трос и уменьшить давление до нужного.
+    // Так же проверяем рабочий ли сейчас промежуток времени
 
     // включаем мотор 2 по часовой стрелке
     motor2_forward();
-    motor2_running_now = true;
+    motor2_running = true;
   }
 
-  // проверяем, что все двигатели выключены и идем спать на 3 часа
-  if (!motor1_running_now && !motor2_running_now)
+  // проверяем, что двигатели отработали и готовимся ко сну
+  if (!motor1_running && !motor2_running)
   {
+    // ЗАПИСЬ ДАННЫХ В EEPROM =========================================
+
+    // получаем адрес для записи данных с датчиков
+    EEPROM.get(1010, eeprom_addres);
+
+    data.day_and_hour[0] = now.day;  // получаем календарный день
+    data.day_and_hour[1] = now.hour; // получаем час
+
+    // записываем значения с датчиков в структуру данных
+    data.sensors_value[0] = sensor1;
+    data.sensors_value[1] = sensor2;
+    data.sensors_value[2] = sensor3;
+    data.sensors_value[3] = sensor4;
+
+    // вывод значений с датчиков на компьютер
+    Serial.println("[ИНФО] Двигатели отработали");
+    Serial.println("[ИНФО] Текущие значения с датчиков:");
+    Serial.print("Календарный день: ");
+    Serial.print(data.day_and_hour[0]);
+    Serial.print(" | час: ");
+    Serial.print(data.day_and_hour[1]);
+    Serial.print(" - ");
+    Serial.print(data.sensors_value[0]);
+    Serial.print(" - ");
+    Serial.print(data.sensors_value[1]);
+    Serial.print(" - ");
+    Serial.print(data.sensors_value[2]);
+    Serial.print(" - ");
+    Serial.println(data.sensors_value[3]);
+
+    // записываем данные с датчиков в EEPROM память
+    EEPROM.put(eeprom_addres, data);
+    // обновляем адрес для записи в  EEPROM
+    eeprom_addres += 10;
+    // сбрасываем адрес, если дошли до конца памяти
+    if (eeprom_addres >= 1000)
+    {
+      eeprom_addres = 0;
+    }
+    // записываем новый адрес в EEPROM
+    EEPROM.put(eeprom_addres, 1010);
+    Serial.println("[ИНФО] Данные записаны в EEPROM");
+
+    // спим 3 часа
     power.sleepDelay(SLEEP_TIME);
   }
 }
