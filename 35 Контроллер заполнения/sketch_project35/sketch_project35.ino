@@ -37,7 +37,7 @@ void loop()
     pot1_value = analogRead(2);
     pot2_value = analogRead(3);
     servo_angle = map(pot1_value, 0, 1023, 30, 180);
-    servo_delay_time = map(pot2_value, 0, 1023, 40000, 50000);
+    servo_delay_time = map(pot2_value, 0, 1023, 10000, 50000);
 
     for (int pos = 0; pos <= servo_angle; pos += 1)
     {
