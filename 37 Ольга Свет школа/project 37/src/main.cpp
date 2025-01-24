@@ -18,11 +18,15 @@ BH1750 lightMeter_GY30;
 
 // Создаеи объект lcd для взаимодействия с библиотекой
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-// LiquidCrystal_I2C lcd(0x26, 16, 2); // если не сработало верхнее, пробуем это
-// LiquidCrystal_I2C lcd(0x3F, 16, 2); // если не сработало верхнее, пробуем это
 
 // создаем переменную с номером пина для мосфет-модуля
 int mosfetPin = 5;
+
+// нужный уровень яркости (в Люксах)
+int desiredBrightnessLevel = 450;
+
+// максимальный уровень яркости (в Люксах)
+int maximumBrightnessLevel = 54000;
 
 void setup()
 {
@@ -49,7 +53,8 @@ void setup()
 float lux = 0;
 
 // переменная для хранения значения яркости лампочки (уровень ШИМ сигнала)
-int brightness = 0;
+// int brightness = 0;
+int brightness = desiredBrightnessLevel * 1024 / maximumBrightnessLevel;
 
 // переменная для хранения текста, который будет выводиться на дисплей
 String text = "";
@@ -59,11 +64,26 @@ void loop()
   // считываем показания с датчика в переменную lux
   lux = lightMeter_GY30.readLightLevel();
 
-  // преобразуем показания с датчика из одного диапазона (0 - 1024), в другой (255 - 0)
-  brightness = map(lux, 0, 1024, 255, 0);
-
-  // регулируем яркость лампочки с помощью ШИМ сигнала
-  analogWrite(mosfetPin, brightness);
+  // если уровень яркости меньше нужного, включаем яркость на 100%
+  if (lux < desiredBrightnessLevel)
+  {
+    analogWrite(mosfetPin, brightness);
+  }
+  // если уровень яркости больше нужного на 25%, включаем яркость 75%
+  else if (lux > desiredBrightnessLevel * 1.25)
+  {
+    analogWrite(mosfetPin, brightness * 0.75);
+  }
+  // если уровень яркости больше нужного на 50%, включаем яркость 50%
+  else if (lux > desiredBrightnessLevel * 1.5)
+  {
+    analogWrite(mosfetPin, brightness * 0.5);
+  }
+  // если уровень яркости больше нужного на 100% (т.е. в 2 раза), выключаем светодиод
+  else if (lux > desiredBrightnessLevel * 2)
+  {
+    analogWrite(mosfetPin, LOW);
+  }
 
   // упаковываем данные в переменную
   text = "LUX: " + String(lux);
