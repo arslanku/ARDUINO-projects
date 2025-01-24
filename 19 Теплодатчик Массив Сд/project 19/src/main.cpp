@@ -8,7 +8,6 @@ Adafruit_MLX90614 mlx = Adafruit_MLX90614();
 void setup()
 {
   Serial.begin(9600);
-  Serial.println("Start");
 
   mlx.begin();
 }
@@ -48,11 +47,11 @@ void loop()
     byte coords[data.amount()];
     data.parseBytes(coords);
 
-    for (byte i = 0; i < data.amount(); i++)
-    {
-      Serial.println(coords[i]);
-      delay(10);
-    }
+    // for (byte i = 0; i < data.amount(); i++)
+    // {
+    //   Serial.println(coords[i]);
+    //   delay(10);
+    // }
 
     getTemp(coords[0], coords[1]);
   }
