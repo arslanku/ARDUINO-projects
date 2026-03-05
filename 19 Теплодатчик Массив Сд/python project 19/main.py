@@ -19,7 +19,11 @@ class MainWindow(QMainWindow):
         self.baudRate = 9600
 
         # динамичный - 1, статичный - 0
+<<<<<<< HEAD
+        self.heatmap_mode = 1
+=======
         self.heatmap_mode = 0
+>>>>>>> f46ba7c2781f92100b0daa64f1846c9d31fd626b
         self.min_heatmap_value = 0.0
         self.max_heatmap_value = 100.0
 
