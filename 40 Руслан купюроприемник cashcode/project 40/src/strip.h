@@ -1,0 +1,6 @@
+
+
+void strip_blinking()
+{
+  
+}
